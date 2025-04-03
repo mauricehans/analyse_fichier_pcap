@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Tableau de Bord de Sécurité</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tableau de Bord d'Analyse de Sécurité</h1>
+        </header>
+
+        <div class="upload-section">
+            <div class="buttons-row">
+                <div class="upload-group">
+                    <input type="file" id="pcapFile" accept=".pcap" class="file-input">
+                    <button onclick="uploadFile()" class="btn">Analyser</button>
+                </div>
+                <button onclick="fetchPcapFromAPI()" class="btn">Récupérer PCAP</button>
+                <button onclick="getActiveFilename()" class="btn">Vérifier fichier actif</button>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <div class="stats-panel">
+                <h2>Résultats d'Analyse</h2>
+                <div id="statistics"></div>
+                <div id="submission-section" style="display: none;">
+                    <h3>Soumettre les résultats</h3>
+                    <div id="submission-data"></div>
+                    <button id="submit-button" onclick="submitResults()" class="btn">Soumettre</button>
+                </div>
+            </div>
+            
+            <div class="threat-panel">
+                <h2>Analyse des Menaces</h2>
+                <div id="threatResults"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
