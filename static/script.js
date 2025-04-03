@@ -1,3 +1,27 @@
+function analyzeLocal() {
+    const fileInput = document.getElementById('pcapFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Veuillez sélectionner un fichier d\'abord');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/analyze_local', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => displayResults(data))
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Erreur lors de l\'analyse locale: ' + error);
+    });
+}
+
 function uploadFile() {
     const fileInput = document.getElementById('pcapFile');
     const file = fileInput.files[0];
@@ -115,24 +139,45 @@ function submitResults(flagData) {
 
 
 function displayResults(data) {
+    if (!data || typeof data !== 'object') {
+        console.error('Données invalides reçues:', data);
+        const statistics = document.getElementById('statistics');
+        statistics.innerHTML = '<div class="error-message">Erreur: Données invalides reçues du serveur</div>';
+        return;
+    }
+
     const statistics = document.getElementById('statistics');
+    let analysisType = '';
+    if (data.local_results) {
+        analysisType = data.remote_submission ? 'Analyse Locale et Distante' : 'Analyse Locale';
+        data = data.local_results;
+    } else {
+        analysisType = 'Analyse Standard';
+    }
+
     statistics.innerHTML = `
         <div class="analysis-summary">
-            <h3>Résumé de l'Analyse</h3>
+            <h3>${analysisType}</h3>
+            <div class="analysis-badge ${data.remote_submission === 'timeout' ? 'warning' : 'success'}">
+                ${data.remote_submission === 'timeout' ? '⚠️ Analyse locale uniquement (timeout serveur)' : 
+                  data.remote_submission === 'error' ? '⚠️ Analyse locale uniquement (erreur serveur)' : 
+                  '✅ Analyse complète'}
+            </div>
             
             <!-- Section des Machines Suspectes et Infectées -->
             <div class="critical-findings">
-                ${data.user_analysis?.suspicious_users?.length ? `
+                ${data.user_analysis && data.user_analysis.suspicious_users && data.user_analysis.suspicious_users.length ? `
                     <div class="suspicious-users-summary">
                         <h4>⚠️ Utilisateurs Suspects Détectés (${data.user_analysis.suspicious_users.length})</h4>
                         <ul class="suspicious-list">
                             ${data.user_analysis.suspicious_users.map(user => `
                                 <li class="suspicious-item">
                                     <div class="ip-info">
-                                        <strong>IP:</strong> ${user.ip}
-                                        <div class="reason">${user.reasons.join(', ')}</div>
+                                        <strong>IP:</strong> ${user.ip || 'Inconnue'}
+                                        <div class="reason">${(user.reasons || []).join(', ') || 'Raison inconnue'}</div>
                                     </div>
-                                    <button onclick="quickCheckIp('${user.ip}')" class="quick-check-btn">
+                                    <button onclick="quickCheckIp('${user.ip || ''}')"
+                                            class="quick-check-btn">
                                         🔍 Vérifier
                                     </button>
                                 </li>
@@ -140,110 +185,39 @@ function displayResults(data) {
                         </ul>
                     </div>
                 ` : ''}
-                
-                ${data.infection_analysis?.potential_flag ? `
-                    <div class="flag-summary">
-                        <h4>🚨 Machine Infectée (FLAG)</h4>
-                        <div class="flag-details">
-                            <strong>IP:</strong> ${data.infection_analysis.potential_flag}
-                            <div class="infection-info">
-                                <span class="attack-source">Source de l'attaque: ${data.infection_analysis.malicious_sources[0] || 'Inconnue'}</span>
-                            </div>
-                        </div>
-                    </div>
-                ` : ''}
             </div>
 
-            <p><strong>Paquets Total:</strong> ${data.total_packets}</p>
+            <p><strong>Paquets Total:</strong> ${data.total_packets || 0}</p>
             <p><strong>Analysé le:</strong> ${new Date().toLocaleString('fr-FR')}</p>
-            
-            <div class="threat-summary">
-                <h3>Résumé des Menaces</h3>
-                <p class="threat-level-high">IPs à Risque Élevé: ${data.threat_analysis?.high_risk?.length || 0}</p>
-                <p class="threat-level-medium">IPs à Risque Moyen: ${data.threat_analysis?.medium_risk?.length || 0}</p>
-                <p class="threat-level-low">IPs à Faible Risque: ${data.threat_analysis?.low_risk?.length || 0}</p>
-            </div>
-        </div>
-        
-        <div class="ip-analysis">
-            <h3>IPs Sources Principales:</h3>
-            <ul>
-                ${Object.entries(data.ip_sources)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([ip, count]) => 
-                        `<li><span class="ip-address">${ip}</span>: <span class="count">${count} paquets</span></li>`
-                    ).join('')}
-            </ul>
-            
-            <h3>IPs Destinations Principales:</h3>
-            <ul>
-                ${Object.entries(data.ip_destinations)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([ip, count]) => 
-                        `<li><span class="ip-address">${ip}</span>: <span class="count">${count} paquets</span></li>`
-                    ).join('')}
-            </ul>
-        </div>
-        
-        <div class="infection-analysis">
-            <h3>Analyse des Infections</h3>
-            ${createInfectionSummary(data.infection_analysis)}
         </div>
     `;
 
-    // Ajouter l'analyse des utilisateurs
-    if (data.user_analysis) {
-        statistics.innerHTML += `
-            <div class="user-analysis">
-                <h3>Analyse des Utilisateurs</h3>
-                <div class="legitimate-users">
-                    <h4>Utilisateurs Légitimes (${data.user_analysis.legitimate_users.length})</h4>
-                    <ul>
-                        ${data.user_analysis.legitimate_users.map(user => `
-                            <li class="user-legitimate">
-                                <strong>IP:</strong> ${user.ip}
-                                <br>
-                                <small>Paquets: ${user.packet_count}, 
-                                Destinations: ${user.unique_destinations}</small>
-                            </li>
-                        `).join('')}
-                    </ul>
-                </div>
-                
-               
-        `;
-    }
-
+    // Afficher les résultats des menaces si disponibles
     const threatResults = document.getElementById('threatResults');
     if (data.threat_analysis) {
         let threatHtml = '<div class="threat-analysis">';
         
-        if (data.threat_analysis.high_risk.length > 0) {
-            threatHtml += '<h3 class="threat-level-high">IPs à Risque Élevé</h3>';
-            data.threat_analysis.high_risk.forEach(threat => {
-                threatHtml += createThreatCard(threat);
-            });
-        }
-        
-        if (data.threat_analysis.medium_risk.length > 0) {
-            threatHtml += '<h3 class="threat-level-medium">IPs à Risque Moyen</h3>';
-            data.threat_analysis.medium_risk.forEach(threat => {
-                threatHtml += createThreatCard(threat);
-            });
-        }
-        
-        if (data.threat_analysis.low_risk.length > 0) {
-            threatHtml += '<h3 class="threat-level-low">IPs à Faible Risque</h3>';
-            data.threat_analysis.low_risk.forEach(threat => {
-                threatHtml += createThreatCard(threat);
-            });
-        }
+        const threatLevels = {
+            high_risk: { title: 'IPs à Risque Élevé', class: 'high' },
+            medium_risk: { title: 'IPs à Risque Moyen', class: 'medium' },
+            low_risk: { title: 'IPs à Faible Risque', class: 'low' }
+        };
+
+        Object.entries(threatLevels).forEach(([level, info]) => {
+            const threats = data.threat_analysis[level] || [];
+            if (threats.length > 0) {
+                threatHtml += `<h3 class="threat-level-${info.class}">${info.title}</h3>`;
+                threats.forEach(threat => {
+                    threatHtml += createThreatCard(threat);
+                });
+            }
+        });
         
         threatHtml += '</div>';
         threatResults.innerHTML = threatHtml;
     }
+
+    // Afficher le bouton de soumission si des données de flag sont présentes
     if (data.infection_analysis?.flag_data) {
         const submitButton = document.createElement('button');
         submitButton.className = 'btn';

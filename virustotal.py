@@ -8,7 +8,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Get API key directly from environment
-VIRUSTOTAL_API_KEY = os.environ.get('VIRUSTOTAL_API_KEY', 'demo_key')
+
+VIRUSTOTAL_API_KEY = '6c54c23d7150b1258739b81457dd4e9a74119516b2c5444e711f8b9f89e0fd58'
+os.environ['VIRUSTOTAL_API_KEY'] = VIRUSTOTAL_API_KEY
+
 logger.info(f"Using VirusTotal API key: {'demo_key' if VIRUSTOTAL_API_KEY == 'demo_key' else '****'}")
 
 def check_ip_reputation(ip):
@@ -24,7 +27,8 @@ def check_ip_reputation(ip):
         time.sleep(0.2)
 
         url = f'https://www.virustotal.com/vtapi/v2/ip-address/report'
-        params = {'apikey': VIRUSTOTAL_API_KEY, 'ip': ip}
+        api_key_to_use = os.getenv('VIRUSTOTAL_API_KEY')
+        params = {'apikey': api_key_to_use, 'ip': ip}
         
         response = requests.get(url, params=params)
         response.raise_for_status()

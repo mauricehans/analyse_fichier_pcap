@@ -28,6 +28,33 @@ API_URL = "http://93.127.203.48:5000/pcap/latest"
 def index():
     return render_template('index.html')
 
+@app.route('/analyze_local', methods=['POST'])
+def analyze_local():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'})
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'})
+    if file:
+        try:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Analyse locale uniquement
+            results = analyze_pcap(filepath)
+            
+            return jsonify({
+                'success': True,
+                'local_results': results
+            })
+        except Exception as e:
+            logger.error(f"Erreur lors de l'analyse locale: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f"Erreur lors de l'analyse: {str(e)}"
+            }), 500
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -118,7 +145,13 @@ def check_ip():
     
     # Si la vérification VirusTotal est demandée
     if verify:
-        vt_result = check_ip_reputation(ip)
+        # Vérifier l'IP avec VirusTotal
+        vt_result = check_ip_reputation(ip,'6c54c23d7150b1258739b81457dd4e9a74119516b2c5444e711f8b9f89e0fd58')
+        # Mettre à jour les détails de l'IP avec le résultat VirusTotal
+        if vt_result:
+            ip_details['virustotal'] = vt_result
+        else:
+            ip_details['virustotal'] = {'error': 'VirusTotal API error'}
         ip_details['virustotal'] = vt_result
         
     return jsonify({

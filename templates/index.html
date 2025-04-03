@@ -15,7 +15,8 @@
             <div class="buttons-row">
                 <div class="upload-group">
                     <input type="file" id="pcapFile" accept=".pcap" class="file-input">
-                    <button onclick="uploadFile()" class="btn">Analyser</button>
+                    <button onclick="uploadFile()" class="btn">Analyser (Distant)</button>
+                    <button onclick="analyzeLocal()" class="btn">Analyser (Local)</button>
                 </div>
                 <button onclick="fetchPcapFromAPI()" class="btn">Récupérer PCAP</button>
                 <button onclick="getActiveFilename()" class="btn">Vérifier fichier actif</button>
